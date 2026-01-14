@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.3em;
+        }
+
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .upload-subtext {
+            color: #999;
+            font-size: 0.85em;
+        }
+
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .file-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+        }
+
+        .file-item:hover {
+            background: #e8e8e8;
+            border-left-color: #667eea;
+        }
+
+        .file-item.active {
+            background: #667eea;
+            color: white;
+            border-left-color: #764ba2;
+        }
+
+        .file-item-name {
+            font-size: 0.9em;
+            word-break: break-word;
+        }
+
+        .main-content {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        button {
+            padding: 8px 12px;
+            border: none;
+            background: #667eea;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .page-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        .page-info input {
+            width: 50px;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .zoom-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .zoom-control input {
+            width: 60px;
+        }
+
+        #pdf-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            margin: 10px 0;
+            max-width: 100%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
+        }
+
+        .no-pdf {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #999;
+            font-size: 1.2em;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .error {
+            padding: 10px;
+            background: #fee;
+            color: #c33;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .info {
+            padding: 10px;
+            background: #efe;
+            color: #3c3;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                order: 2;
+            }
+
+            .main-content {
+                order: 1;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .toolbar-group {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            button {
+                flex: 1;
+                min-width: 80px;
+            }
+        }
+
+        .delete-btn {
+            background: #e74c3c;
+            font-size: 0.8em;
+            padding: 4px 8px;
+            margin-top: 5px;
+            width: 100%;
+        }
+
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Upload</h2>
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📤</div>
+                <div class="upload-text">Click or drag PDF</div>
+                <div class="upload-subtext">Max 50MB</div>
+            </div>
+            <input type="file" id="file-input" accept=".pdf" />
+
+            <h2 style="margin-top: 20px;">Your Files</h2>
+            <div class="file-list" id="file-list">
+                <div style="color: #999; text-align: center; padding: 20px;">No files yet</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div id="message" style="display: none;"></div>
+
+            <div class="toolbar">
+                <div class="toolbar-group">
+                    <button id="prev-btn" title="Previous page">← Previous</button>
+                    <div class="page-info">
+                        <span>Page</span>
+                        <input type="number" id="page-num" value="1" min="1">
+                        <span>of <span id="page-count">0</span></span>
+                    </div>
+                    <button id="next-btn" title="Next page">Next →</button>
+                </div>
+
+                <div class="toolbar-group">
+                    <button id="zoom-in-btn" title="Zoom in">🔍+</button>
+                    <div class="zoom-control">
+                        <span style="color: #333; font-size: 0.9em;">Zoom:</span>
+                        <input type="range" id="zoom-slider" min="50" max="200" value="100" title="Zoom level">
+                        <span id="zoom-value" style="color: #333; min-width: 40px;">100%</span>
+                    </div>
+                    <button id="zoom-out-btn" title="Zoom out">🔍-</button>
+                    <button id="fit-btn" title="Fit to page">⬜</button>
+                </div>
+
+                <div class="toolbar-group">
+                    <button id="refresh-btn" title="Refresh file list">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <div id="pdf-container" class="no-pdf">
+                Select a PDF file to view
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Wait for PDF.js to load
+        function initPDF() {
+            if (typeof pdfjsLib === 'undefined') {
+                console.error('PDF.js library failed to load, retrying...');
+                setTimeout(initPDF, 1000);
+                return;
+            }
+
+            console.log('PDF.js loaded successfully');
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            loadFileList();
+        }
+
+        // Check if library is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPDF);
+        } else {
+            initPDF();
+        }
+
+        // DOM Elements
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const fileList = document.getElementById('file-list');
+        const pdfContainer = document.getElementById('pdf-container');
+        const pageNum = document.getElementById('page-num');
+        const pageCount = document.getElementById('page-count');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const zoomSlider = document.getElementById('zoom-slider');
+        const zoomValue = document.getElementById('zoom-value');
+        const zoomInBtn = document.getElementById('zoom-in-btn');
+        const zoomOutBtn = document.getElementById('zoom-out-btn');
+        const fitBtn = document.getElementById('fit-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const messageDiv = document.getElementById('message');
+
+        // State
+        let pdfDoc = null;
+        let currentZoom = 100;
+        let currentScale = 1.5;
+        let renderedPages = new Set();
+
+        // File upload handlers
+        uploadArea.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                uploadFile(e.target.files[0]);
+            }
+        });
+
+        function uploadFile(file) {
+            console.log('Uploading file:', file.name);
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                showMessage('Only PDF files are allowed', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showMessage('Uploading...', 'info');
+            console.log('Sending upload request...');
+
+            fetch('/upload_pdf', { method: 'POST', body: formData })
+                .then(res => {
+                    console.log('Upload response status:', res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Upload response data:', data);
+                    if (data.status === 'success') {
+                        showMessage('PDF uploaded successfully!', 'info');
+                        loadFileList();
+                        setTimeout(() => openPDF(`/pdfs/${data.filename}`), 500);
+                    } else {
+                        showMessage(data.message || 'Upload failed', 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error('Upload error:', err);
+                    showMessage('Error: ' + err.message, 'error');
+                });
+
+            fileInput.value = '';
+        }
+
+        function showMessage(text, type) {
+            console.log('Message [' + type + ']:', text);
+            messageDiv.textContent = text;
+            messageDiv.className = type;
+            messageDiv.style.display = 'block';
+            if (type === 'info') {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function loadFileList() {
+            console.log('Loading file list...');
+            fetch('/list_pdfs')
+                .then(res => {
+                    console.log('File list response status:', res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('File list data:', data);
+                    if (data.status === 'success' && data.files.length > 0) {
+                        fileList.innerHTML = data.files.map(file => `
+                            <div class="file-item" onclick="openPDF('/pdfs/${encodeURIComponent(file)}')">
+                                <div class="file-item-name">📄 ${file}</div>
+                                <button class="delete-btn" onclick="deleteFile('${file}', event)">Delete</button>
+                            </div>
+                        `).join('');
+                    } else {
+                        fileList.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">No files yet</div>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading files:', err);
+                });
+        }
+
+        function deleteFile(filename, event) {
+            event.stopPropagation();
+            if (confirm(`Delete ${filename}?`)) {
+                const filepath = `/pdfs/${filename}`;
+                fetch(filepath, { method: 'DELETE' })
+                    .then(() => {
+                        loadFileList();
+                        if (pdfDoc) {
+                            closePDF();
+                        }
+                    })
+                    .catch(() => {
+                        showMessage('Error deleting file', 'error');
+                    });
+            }
+        }
+
+        function openPDF(url) {
+            if (typeof pdfjsLib === 'undefined') {
+                showMessage('Error: PDF.js library not loaded yet', 'error');
+                console.error('pdfjsLib not available');
+                return;
+            }
+
+            showMessage('Loading PDF...', 'info');
+            console.log('Opening PDF:', url);
+            pdfjsLib.getDocument(url).promise.then(pdf => {
+                pdfDoc = pdf;
+                pageCount.textContent = pdf.numPages;
+                pageNum.max = pdf.numPages;
+                pageNum.value = 1;
+                pdfContainer.innerHTML = '';
+                renderedPages.clear();
+                renderPage(1);
+                updateButtonStates();
+                showMessage('PDF loaded successfully!', 'info');
+
+                // Update active file in sidebar
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.classList.remove('active');
+                    const itemUrl = item.getAttribute('onclick');
+                    if (itemUrl && itemUrl.includes(url)) {
+                        item.classList.add('active');
+                    }
+                });
+            }).catch(err => {
+                showMessage('Error loading PDF: ' + err.message, 'error');
+                console.error('PDF loading error:', err);
+                pdfDoc = null;
+            });
+        }
+
+        function closePDF() {
+            pdfDoc = null;
+            pdfContainer.innerHTML = '<div class="no-pdf">Select a PDF file to view</div>';
+            pageCount.textContent = '0';
+            pageNum.value = 1;
+            updateButtonStates();
+        }
+
+        function renderPage(pageNumber) {
+            if (!pdfDoc || pageNumber < 1 || pageNumber > pdfDoc.numPages) return;
+
+            if (renderedPages.has(pageNumber)) return;
+
+            pdfDoc.getPage(pageNumber).then(page => {
+                const viewport = page.getViewport({ scale: currentScale });
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                page.render({ canvasContext: ctx, viewport: viewport }).promise.then(() => {
+                    if (pageNumber === 1) {
+                        pdfContainer.innerHTML = '';
+                    }
+                    pdfContainer.appendChild(canvas);
+                    renderedPages.add(pageNumber);
+                });
+            });
+        }
+
+        // Page navigation
+        pageNum.addEventListener('change', () => {
+            const pageNumber = parseInt(pageNum.value);
+            if (pdfDoc && pageNumber >= 1 && pageNumber <= pdfDoc.numPages) {
+                pdfContainer.innerHTML = '';
+                renderedPages.clear();
+                renderPage(pageNumber);
+                updateButtonStates();
+            }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            if (pdfDoc) {
+                let newPage = parseInt(pageNum.value) - 1;
+                if (newPage >= 1) {
+                    pageNum.value = newPage;
+                    pageNum.dispatchEvent(new Event('change'));
+                }
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (pdfDoc) {
+                let newPage = parseInt(pageNum.value) + 1;
+                if (newPage <= pdfDoc.numPages) {
+                    pageNum.value = newPage;
+                    pageNum.dispatchEvent(new Event('change'));
+                }
+            }
+        });
+
+        // Zoom controls
+        zoomSlider.addEventListener('input', (e) => {
+            currentZoom = parseInt(e.target.value);
+            zoomValue.textContent = currentZoom + '%';
+            currentScale = currentZoom / 100 * 1.5;
+            if (pdfDoc) {
+                const currentPage = parseInt(pageNum.value);
+                pdfContainer.innerHTML = '';
+                renderedPages.clear();
+                renderPage(currentPage);
+            }
+        });
+
+        zoomInBtn.addEventListener('click', () => {
+            zoomSlider.value = Math.min(200, currentZoom + 10);
+            zoomSlider.dispatchEvent(new Event('input'));
+        });
+
+        zoomOutBtn.addEventListener('click', () => {
+            zoomSlider.value = Math.max(50, currentZoom - 10);
+            zoomSlider.dispatchEvent(new Event('input'));
+        });
+
+        fitBtn.addEventListener('click', () => {
+            zoomSlider.value = 100;
+            zoomSlider.dispatchEvent(new Event('input'));
+        });
+
+        refreshBtn.addEventListener('click', loadFileList);
+
+        function updateButtonStates() {
+            if (!pdfDoc) {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                pageNum.disabled = true;
+                return;
+            }
+            const currentPage = parseInt(pageNum.value);
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= pdfDoc.numPages;
+            pageNum.disabled = false;
+        }
+
+        // Load file list on page load
+        loadFileList();
+    </script>
+</body>
+</html>
